@@ -163,6 +163,7 @@ function multiple_key_choice(){
 		while IFS=: read -r line; do
 			id=$(echo $line | sed 's/\([^:]*\):.*/\1/')
 			key=$(echo $line | sed 's/[^:]*:\([^+]*\)+.*/\1/')
+			last_modified=$(echo $line | sed 's/.*::\([0-9]\{2\}-[0-9]\{2\}-[0-9]\{4\}:[0-9]\{2\}-[0-9]\{2\}-[0-9]\{2\}\)::.*/\1/')
 			if [[ -n $id ]]; then
 				if [[ $id -lt 10 ]]; then
 					id="0$id"
@@ -173,7 +174,7 @@ function multiple_key_choice(){
 				id="NA"
 			fi
 			if [[ $1 == $key ]]; then
-				echo "ID: $id | Key: $key"
+				echo "ID: $id | Key: $key | Last Modified: $last_modified"
 			fi
 		done < "$enc_shadow_path"
 		read -p "Type your choice:" choice
