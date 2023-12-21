@@ -33,6 +33,7 @@ function remove_empty_line(){
 }
 
 function detect_multiple_key(){
+	# $1 --> key
 	count=$(grep -E ":$1+" $enc_shadow_path | wc -l)
     result=$(python3 -c "count = $count; print(1) if count > 1 else print(0)") #return 1 for multiple detection or 0 for 1 or none
 	return $result
@@ -55,7 +56,7 @@ function check_or_create_directory(){
 function generate_private_key(){
 	# $1 -> hashed_pass
 	check_or_create_directory $private_key_location
-	if [[ $? -eq 0]]; then
+	if [[ $? -eq 0 ]]; then
 		openssl genrsa -out "$private_key_location/$1.pem" 2048
 		if [[ $? -eq 0 ]]; then
 			generated_private_key_location="$private_key_location/$1.pem"
@@ -71,7 +72,7 @@ function generate_private_key(){
 function generate_public_key(){
 	# $1 -> hashed_pass
 	check_or_create_directory $public_key_location
-	if [[ $? -eq 0]]; then
+	if [[ $? -eq 0 ]]; then
 		openssl rsa -pubout -in "$private_key_location/$1.pem" -out "$public_key_location/$1.pem" > /dev/null 2>&1
 		if [[ $? -eq 0 ]]; then
 			generated_public_key_location="$public_key_location/$1.pem"
@@ -87,7 +88,7 @@ function generate_public_key(){
 function encrypt_pass(){
 	# $1 -> plain_text e.g. password
 	check_or_create_directory $shadowed_password_location
-	if [[ $? -eq 0]]; then
+	if [[ $? -eq 0 ]]; then
 		echo "$1" | openssl pkeyutl -encrypt -inkey "$generated_public_key_location" -pubin -out "$shadowed_password_location/$hashed_pass"_encrypted
 		if [[ $? -eq 0 ]]; then
 			return 0
@@ -102,9 +103,10 @@ function encrypt_pass(){
 function decrypt_pass(){
 	# $1 -> private_key
 	# $2 -> encrypted_text
-	pass=$(openssl pkeyutl -decrypt -inkey "$1.pem" -in "$2.txt" -out "$2"_decrypted.txt | cat ./"$2"_decrypted.text)
+	dec_pass=$(openssl pkeyutl -decrypt -inkey "$1.pem" -in "$2"_encrypted -out "$2"_decrypted.txt | cat "$2"_decrypted.txt)
+	# rm ./"$2"_decrypted.text
 	if [[ $? -eq 0 ]]; then
-		return "$pass"
+		return 0
 	else
 		return 1
 	fi
@@ -170,7 +172,9 @@ function multiple_key_choice(){
 			else
 				id="NA"
 			fi
-			echo "ID: $id | Key: $key"
+			if [[ $1 == $key ]]; then
+				echo "ID: $id | Key: $key"
+			fi
 		done < "$enc_shadow_path"
 		read -p "Type your choice:" choice
 		return $choice
@@ -178,7 +182,10 @@ function multiple_key_choice(){
 }
 
 function get(){
-	awk  -F '+' '/$2/ {print $2}' $enc_shadow_path
+	multiple_key_choice $1
+	enc_pass=$(grep -E "$?:$1\\+" $enc_shadow_path | grep -Eo "\\+.*\\+" | sed '$ s/.$//' | sed 's/^.//')
+	decrypt_pass $private_key_location/$enc_pass $shadowed_password_location/$enc_pass
+	echo "$dec_pass"
 } 
 
 function save(){
@@ -188,10 +195,9 @@ function save(){
 	generate_private_key $hashed_pass
 	generate_public_key $hashed_pass
 	encrypt_pass $2
-	exit 0
 	readonly encrypted_pass=$?
 	incremented_line=$(echo "$(count_lines) + 1" | bc)
-	echo "$incremented_line:$1+$encrypted_pass+::$(fetch_current_date)::[$3]" >> $enc_shadow_path
+	echo "$incremented_line:$1+$hashed_pass+::$(fetch_current_date)::[$3]" >> $enc_shadow_path
 }
 
 function edit(){
@@ -222,7 +228,7 @@ function help(){
 #main
 if [[ $# -gt 0 ]]; then
 	if [[ $1 == "--get" && -n $2 ]]; then
-		get
+		get $2
 
 	elif [[ $1 == "--save" && -n $2 && -n $3 && -n $4 ]]; then
 		save $2 $3 $4
