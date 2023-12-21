@@ -103,7 +103,7 @@ function encrypt_pass(){
 function decrypt_pass(){
 	# $1 -> private_key
 	# $2 -> encrypted_text
-	dec_pass=$(openssl pkeyutl -decrypt -inkey "$1.pem" -in "$2"_encrypted -out "$2"_decrypted.txt | cat "$2"_decrypted.txt)
+	dec_pass=$(openssl pkeyutl -decrypt -inkey "$1.pem" -in "$2"_encrypted -out "$2"_decrypted.txt && cat "$2"_decrypted.txt)
 	# rm ./"$2"_decrypted.text
 	if [[ $? -eq 0 ]]; then
 		return 0
@@ -184,9 +184,13 @@ function multiple_key_choice(){
 
 function get(){
 	multiple_key_choice $1
-	enc_pass=$(grep -E "$?:$1\\+" $enc_shadow_path | grep -Eo "\\+.*\\+" | sed '$ s/.$//' | sed 's/^.//')
-	decrypt_pass $private_key_location/$enc_pass $shadowed_password_location/$enc_pass
-	echo "$dec_pass"
+	if [[ $? -eq 0 ]]; then
+		enc_pass=$(grep -E ":$1\\+" $enc_shadow_path | grep -Eo "\\+.*\\+" | sed '$ s/.$//' | sed 's/^.//')
+	else
+		enc_pass=$(grep -E "$?:$1\\+" $enc_shadow_path | grep -Eo "\\+.*\\+" | sed '$ s/.$//' | sed 's/^.//')
+	fi
+	decrypt_pass "$private_key_location/$enc_pass" "$shadowed_password_location/$enc_pass"
+	echo "Password: $dec_pass"
 } 
 
 function save(){
