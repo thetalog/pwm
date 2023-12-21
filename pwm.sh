@@ -37,13 +37,32 @@ function detect_multiple_key(){
     result=$(python3 -c "count = $count; print(1) if count > 1 else print(0)") #return 1 for multiple detection or 0 for 1 or none
 	return $result
 }
+
+function check_or_create_directory(){
+	if [[ -e $1 ]]; then
+		return 0
+	else
+		sudo mkdir $1 > /dev/null 2>&1
+		if [[ $? -eq 0 ]]; then
+			return 0
+		else
+			return 1
+		fi
+	fi
+}
+
 # remove sudo from everywhere
 function generate_private_key(){
 	# $1 -> hashed_pass
-	openssl genrsa -out "$private_key_location/$1.pem" 2048
-	if [[ $? -eq 0 ]]; then
-		generated_private_key_location="$private_key_location/$1.pem"
-		return 0
+	check_or_create_directory $private_key_location
+	if [[ $? -eq 0]]; then
+		openssl genrsa -out "$private_key_location/$1.pem" 2048
+		if [[ $? -eq 0 ]]; then
+			generated_private_key_location="$private_key_location/$1.pem"
+			return 0
+		else
+			return 1
+		fi
 	else
 		return 1
 	fi
@@ -51,21 +70,31 @@ function generate_private_key(){
 
 function generate_public_key(){
 	# $1 -> hashed_pass
-	openssl rsa -pubout -in "$private_key_location/$1.pem" -out "$public_key_location/$1.pem" > /dev/null 2>&1
-	if [[ $? -eq 0 ]]; then
-		generated_public_key_location="$public_key_location/$1.pem"
-		return 0
-	else
+	check_or_create_directory $public_key_location
+	if [[ $? -eq 0]]; then
+		openssl rsa -pubout -in "$private_key_location/$1.pem" -out "$public_key_location/$1.pem" > /dev/null 2>&1
+		if [[ $? -eq 0 ]]; then
+			generated_public_key_location="$public_key_location/$1.pem"
+			return 0
+		else
+			return 1
+		fi
+	else 
 		return 1
 	fi
 }
 
 function encrypt_pass(){
 	# $1 -> plain_text e.g. password
-	echo "$1" | openssl pkeyutl -encrypt -inkey "$generated_public_key_location" -pubin -out "$shadowed_password_location/$hashed_pass"_encrypted
-	if [[ $? -eq 0 ]]; then
-		return 0
-	else
+	check_or_create_directory $shadowed_password_location
+	if [[ $? -eq 0]]; then
+		echo "$1" | openssl pkeyutl -encrypt -inkey "$generated_public_key_location" -pubin -out "$shadowed_password_location/$hashed_pass"_encrypted
+		if [[ $? -eq 0 ]]; then
+			return 0
+		else
+			return 1
+		fi
+	else 
 		return 1
 	fi
 }
@@ -73,9 +102,9 @@ function encrypt_pass(){
 function decrypt_pass(){
 	# $1 -> private_key
 	# $2 -> encrypted_text
-	openssl pkeyutl -decrypt -inkey "$1.pem" -in "$2.txt" -out "$2"_decrypted.txt
+	pass=$(openssl pkeyutl -decrypt -inkey "$1.pem" -in "$2.txt" -out "$2"_decrypted.txt | cat ./"$2"_decrypted.text)
 	if [[ $? -eq 0 ]]; then
-		return 0
+		return "$pass"
 	else
 		return 1
 	fi
