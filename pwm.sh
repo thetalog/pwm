@@ -184,10 +184,11 @@ function multiple_key_choice(){
 
 function get(){
 	multiple_key_choice $1
-	if [[ $? -eq 0 ]]; then
+	choice=$?
+	if [[ $choice -eq 0 ]]; then
 		enc_pass=$(grep -E ":$1\\+" $enc_shadow_path | grep -Eo "\\+.*\\+" | sed '$ s/.$//' | sed 's/^.//')
 	else
-		enc_pass=$(grep -E "$?:$1\\+" $enc_shadow_path | grep -Eo "\\+.*\\+" | sed '$ s/.$//' | sed 's/^.//')
+		enc_pass=$(grep -E "$choice:$1\\+" $enc_shadow_path | grep -Eo "\\+.*\\+" | sed '$ s/.$//' | sed 's/^.//')
 	fi
 	decrypt_pass "$private_key_location/$enc_pass" "$shadowed_password_location/$enc_pass"
 	echo "Password: $dec_pass"
@@ -207,20 +208,30 @@ function save(){
 
 function edit(){
 	#TODO update time
-	search_key=$2
-	replace_key=$3
-	replace_label=$4
+	search_key=$1
+	replace_key=$2
+	replace_label=$3
 	multiple_key_choice $search_key
 	id="$?"
 	if [[ $id -eq 0 ]]; then
 		id=""
 	fi
-	sed_command_1="sudo sed -i -e '/$id:$search_key\\+/ { s/\\(\\+\\).*\\(\\+\\)/\\1$replace_key\\2/;"
+	function recreate_password(){
+		hash_pass $1
+		generate_private_key $hashed_pass
+		generate_public_key $hashed_pass
+		encrypt_pass $1
+		readonly encrypted_repass=$?
+	}
+	recreate_password "$replace_key"
+	current_date_and_time=$(fetch_current_date)
+	sed_command_1="sudo sed -i -e '/$id:$search_key\\+/ { s/\\(\\+\\).*\\(\\+\\)/\\1$hashed_pass\\2/; s/\\(\\:\\:\\).*\\(\\:\\:\\)/\\1$current_date_and_time\\2/; "
 	sed_command_3="' $enc_shadow_path"
-	if [[ -n $replace_key ]]; then
-		sed_command_2="s/\\(\\[\\).*\\(\\]\\)/\\1$replace_label\\2/; }"
-		sed_command="$sed_command_1$sed_command_2$sed_command_3"
-		echo "$sed_command"
+	if [[ -n $replace_label ]]; then
+		sed_command_2="s/\\(\\[\\).*\\(\\]\\)/\\1$replace_label\\2/;"
+		sed_command="$sed_command_1$sed_command_2}$sed_command_3"
+	else
+		sed_command="$sed_command_1}$sed_command_3"
 	fi
 	eval "$sed_command"
 }
@@ -239,7 +250,7 @@ if [[ $# -gt 0 ]]; then
 		save $2 $3 $4
 
 	elif [[ $1 == "--edit" && -n $2 && -n $3 && -n $4 ]]; then
-		edit
+		edit $2 $3 $4
 
 	elif [[ $1 == "--help" ]]; then
 		help
