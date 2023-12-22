@@ -20,7 +20,8 @@ function fetch_current_date(){
 }
 
 function count_lines(){
-	cat -n $enc_shadow_path | cut -f1 | wc -l
+	x=$(cat -n $enc_shadow_path | cut -f1 | wc -l)
+	return $x
 }
 
 function remove_empty_line(){
@@ -202,7 +203,9 @@ function save(){
 	generate_public_key $hashed_pass
 	encrypt_pass $2
 	readonly encrypted_pass=$?
-	incremented_line=$(echo "$(count_lines) + 1" | bc)
+	count_lines
+	total_lines=$?
+	incremented_line=$(echo "$total_lines + 1" | bc)
 	echo "$incremented_line:$1+$hashed_pass+::$(fetch_current_date)::[$3]" >> $enc_shadow_path
 }
 
@@ -236,7 +239,28 @@ function edit(){
 	eval "$sed_command"
 }
 
-function help(){
+function sort_id(){
+	count_lines
+	total_lines=$?
+	for ((x=1; x<=$total_lines; x++)); do
+		sed -n "$x"p $enc_shadow_path | sed -e s/^[^:]*:/$x:/ >> /tmp/pwm_temp 
+	done
+	sudo cp /tmp/pwm_temp $enc_shadow_path 
+	sudo rm /tmp/pwm_temp
+	return 0
+}
+
+function remove(){
+	multiple_key_choice $1
+	id="$?"
+	if [[ $id -eq 0 ]]; then
+		id=""
+	fi
+	sudo sed -i /$id:$1\\+/d $enc_shadow_path
+	echo "ID: $id | Key: $1 has been removed successful!"
+}
+
+function help(){                    
 	echo "pwm Password Manager Help Menu"
 }
 
@@ -251,6 +275,10 @@ if [[ $# -gt 0 ]]; then
 
 	elif [[ $1 == "--edit" && -n $2 && -n $3 && -n $4 ]]; then
 		edit $2 $3 $4
+
+	elif [[ $1 == "--remove" && -n $2 ]]; then
+		remove $2
+		sort_id
 
 	elif [[ $1 == "--help" ]]; then
 		help
