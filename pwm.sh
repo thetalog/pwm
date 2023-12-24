@@ -195,6 +195,18 @@ function get(){
 	echo "Password: $dec_pass"
 } 
 
+function get_all(){
+	count_lines
+	total_lines=$?
+	for ((x=1; x<=$total_lines; x++)); do
+		key_name=$(sed -n "$x"p $enc_shadow_path | grep -Eo "\\:.*\\+" | sed '$ s/.$//' | sed 's/^.//')
+		enc_pass=$(sed -n "$x"p $enc_shadow_path | grep -Eo "\\+.*\\+" | sed '$ s/.$//' | sed 's/^.//')
+		last_modify=$(sed -n "$x"p $enc_shadow_path | grep -Eo "\\::.*\\::" | sed '$ s/.$//' | sed 's/^.//')
+		decrypt_pass "$private_key_location/$enc_pass" "$shadowed_password_location/$enc_pass"
+		echo "Key: $key_name | Password: $dec_pass | Last Modify: $last_modify"
+	done
+}
+
 function save(){
 	check_shadow_exits
 	remove_empty_line
@@ -264,16 +276,18 @@ function help(){
 	echo "pwm Password Manager Help Menu"
 }
 
-
 #main
 if [[ $# -gt 0 ]]; then
 	if [[ $1 == "--get" && -n $2 ]]; then
 		get $2
 
+	if [[ $1 == "--get-all"]]; then
+		getall
+
 	elif [[ $1 == "--save" && -n $2 && -n $3 && -n $4 ]]; then
 		save $2 $3 $4
 
-	elif [[ $1 == "--edit" && -n $2 && -n $3 && -n $4 ]]; then
+	elif [[ $1 == "--edit" && -n $2 && -n $3 || -n $4 ]]; then
 		edit $2 $3 $4
 
 	elif [[ $1 == "--remove" && -n $2 ]]; then
