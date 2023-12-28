@@ -281,7 +281,7 @@ if [[ $# -gt 0 ]]; then
 	if [[ $1 == "--get" && -n $2 ]]; then
 		get $2
 
-	if [[ $1 == "--get-all"]]; then
+	if [[ $1 == "--get-all" ]]; then
 		getall
 
 	elif [[ $1 == "--save" && -n $2 && -n $3 && -n $4 ]]; then
